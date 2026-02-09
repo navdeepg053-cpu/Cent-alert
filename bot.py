@@ -1,6 +1,3 @@
-# CEnT-S Telegram Bot - Standalone Version
-# Deploy this to Render.com for FREE 24/7 uptime
-
 import os
 import asyncio
 import logging
