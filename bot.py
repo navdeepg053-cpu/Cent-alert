@@ -1,136 +1,39 @@
 import os
-import asyncio
 import logging
-from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-import httpx
-from bs4 import BeautifulSoup
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8426719870:AAHvb1xCxA47cJZoK0yJBOXSsZM-EmGlA4Y")
-PORT = int(os.environ.get("PORT", 8080))
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
+BOT_TOKEN = "8327314498:AAHtqV2n9TQzhjj0UTgYNHqdMRbHuCvkKeg"
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-subscribers = set()
-CISIA_URL = "https://testcisia.it/calendario.php?tolc=cents&lingua=inglese"
-
-async def scrape_cisia():
-    spots = []
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as http:
-            r = await http.get(CISIA_URL, headers={"User-Agent": "Mozilla/5.0"})
-            soup = BeautifulSoup(r.text, 'lxml')
-            table = soup.find('table')
-            if table:
-                for row in table.find_all('tr'):
-                    cells = row.find_all('td')
-                    if len(cells) >= 7:
-                        test_type = cells[0].get_text(strip=True)
-                        if "CASA" in test_type.upper():
-                            has_link = cells[6].find('a') is not None
-                            spots.append({
-                                "university": cells[1].get_text(strip=True),
-                                "city": cells[3].get_text(strip=True),
-                                "deadline": cells[4].get_text(strip=True),
-                                "spots": cells[5].get_text(strip=True),
-                                "available": has_link,
-                                "test_date": cells[7].get_text(strip=True) if len(cells) > 7 else ""
-                            })
-    except Exception as e:
-        logger.error(f"Scrape error: {e}")
-    return spots
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     name = update.effective_user.first_name
-    subscribers.add(chat_id)
-    await update.message.reply_html(f"👋 <b>Welcome, {name}!</b>\n\n🔑 Your Chat ID:\n<code>{chat_id}</code>\n\n👆 Tap to copy, paste in the app!\n\n✅ You're now subscribed to CENT@CASA alerts!")
-    logger.info(f"New subscriber: {chat_id}")
-
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    spots = await scrape_cisia()
-    available = [s for s in spots if s["available"]]
-    await update.message.reply_html(f"🤖 <b>Bot Status: ONLINE</b>\n\n📊 CENT@CASA Sessions: {len(spots)}\n✅ Available spots: {len(available)}\n👥 Subscribers: {len(subscribers)}\n\nYour ID: <code>{chat_id}</code>")
+    await update.message.reply_html(f"👋 <b>Welcome, {name}!</b>\n\n🔑 Your Chat ID:\n<code>{chat_id}</code>\n\n👆 Tap to copy!")
+    logger.info(f"User {chat_id} started")
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     await update.message.reply_html(f"🔑 <code>{chat_id}</code>")
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_html("🤖 <b>CEnT-S Alert Bot</b>\n\n/start - Get your Chat ID & subscribe\n/status - Check bot & spot status\n/id - Show your Chat ID\n/check - Check for available spots now\n/stop - Unsubscribe from alerts")
-
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    subscribers.discard(chat_id)
-    await update.message.reply_text("🔕 You've been unsubscribed. Send /start to re-subscribe.")
-
-async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Checking CISIA...")
-    spots = await scrape_cisia()
-    available = [s for s in spots if s["available"]]
-    if available:
-        msg = "🟢 <b>SPOTS AVAILABLE!</b>\n\n"
-        for s in available:
-            msg += f"🏫 {s['university']}\n📍 {s['city']}\n📅 {s['test_date']}\n🎫 {s['spots']}\n\n"
-        msg += "👉 <a href='https://testcisia.it/studenti_tolc/login_sso.php'>BOOK NOW</a>"
-    else:
-        msg = f"🔴 No spots available.\n\nTotal CENT@CASA sessions: {len(spots)}\nAll currently full."
-    await update.message.reply_html(msg)
+    await update.message.reply_html("🤖 <b>Commands:</b>\n/start - Get Chat ID\n/id - Show ID\n/help - Help")
 
 async def handle_any(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    await update.message.reply_html(f"Your Chat ID: <code>{chat_id}</code>\nSend /help for commands.")
-
-last_available = set()
-
-async def check_and_alert(app):
-    global last_available
-    while True:
-        try:
-            spots = await scrape_cisia()
-            available = {f"{s['university']}|{s['test_date']}" for s in spots if s["available"]}
-            new_spots = available - last_available
-            if new_spots and subscribers:
-                for spot in spots:
-                    key = f"{spot['university']}|{spot['test_date']}"
-                    if key in new_spots:
-                        msg = f"🟢 <b>NEW SPOT AVAILABLE!</b>\n\n🏫 {spot['university']}\n📍 {spot['city']}\n📅 {spot['test_date']}\n⏰ Deadline: {spot['deadline']}\n🎫 Spots: {spot['spots']}\n\n👉 <a href='https://testcisia.it/studenti_tolc/login_sso.php'>BOOK NOW!</a>"
-                        for chat_id in subscribers.copy():
-                            try:
-                                await app.bot.send_message(chat_id, msg, parse_mode="HTML")
-                                logger.info(f"Alert sent to {chat_id}")
-                            except Exception as e:
-                                logger.error(f"Failed to send to {chat_id}: {e}")
-                                subscribers.discard(chat_id)
-            last_available = available
-            logger.info(f"Check done: {len(available)} available, {len(subscribers)} subscribers")
-        except Exception as e:
-            logger.error(f"Check error: {e}")
-        await asyncio.sleep(30)
+    await update.message.reply_html(f"Your Chat ID: <code>{chat_id}</code>")
 
 def main():
-    logger.info("Starting CEnT-S Alert Bot...")
+    logger.info("Starting bot...")
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(CommandHandler("help", help_cmd))
-    app.add_handler(CommandHandler("stop", stop))
-    app.add_handler(CommandHandler("check", check))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_any))
-    async def post_init(application):
-        asyncio.create_task(check_and_alert(application))
-    app.post_init = post_init
-    if WEBHOOK_URL:
-        logger.info(f"Starting webhook mode: {WEBHOOK_URL}")
-        app.run_webhook(listen="0.0.0.0", port=PORT, url_path=BOT_TOKEN, webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
-    else:
-        logger.info("Starting polling mode")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("Bot running with polling...")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
