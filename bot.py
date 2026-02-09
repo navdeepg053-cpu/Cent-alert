@@ -1,4 +1,3 @@
-```
 # CEnT-S Telegram Bot - Standalone Version
 # Deploy this to Render.com for FREE 24/7 uptime
 
@@ -138,4 +137,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
