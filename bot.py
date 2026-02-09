@@ -1,20 +1,15 @@
-import logging
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import telebot
 
 BOT_TOKEN = "8327314498:AAHtqV2n9TQzhjj0UTgYNHqdMRbHuCvkKeg"
+bot = telebot.TeleBot(BOT_TOKEN)
 
-logging.basicConfig(level=logging.INFO)
+@bot.message_handler(commands=['start', 'id'])
+def send_id(message):
+    bot.reply_to(message, f"Your Chat ID:\n{message.chat.id}")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    await update.message.reply_text(f"Welcome!\n\nYour Chat ID:\n{chat_id}")
+@bot.message_handler(func=lambda m: True)
+def echo(message):
+    bot.reply_to(message, f"Chat ID: {message.chat.id}")
 
-async def any_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    await update.message.reply_text(f"Your Chat ID: {chat_id}")
-
-app = Application.builder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT, any_msg))
-app.run_polling()
+print("Bot starting...")
+bot.polling()
