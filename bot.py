@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import httpx
 from bs4 import BeautifulSoup
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8327314498:AAHtqV2n9TQzhjj0UTgYNHqdMRbHuCvkKeg")
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8426719870:AAHvb1xCxA47cJZoK0yJBOXSsZM-EmGlA4Y")
 PORT = int(os.environ.get("PORT", 8080))
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
 
